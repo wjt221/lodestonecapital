@@ -1,0 +1,1112 @@
+// =============================================================================
+// Lodestone Capital - Prisma Schema
+// =============================================================================
+// Database: PostgreSQL
+// ORM: Prisma 5.x
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator zod {
+  provider                         = "zod-prisma-types"
+  output                           = "./generated/zod"
+  createInputTypes                 = true
+  createModelTypes                 = true
+  addIncludeType                   = true
+  addSelectType                    = true
+  createOptionalDefaultValuesTypes = true
+  createRelationValuesTypes        = true
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum Role {
+  SUPER_ADMIN
+  MANAGING_PARTNER
+  PARTNER
+  PRINCIPAL
+  ASSOCIATE
+  ANALYST
+  INVESTOR_RELATIONS
+  COMPLIANCE
+  FUND_ACCOUNTANT
+  LP_VIEWER
+  READ_ONLY
+}
+
+enum DataClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+  HIGHLY_RESTRICTED
+}
+
+enum DealStage {
+  SOURCING
+  INITIAL_REVIEW
+  SCREENING
+  DILIGENCE
+  IC_REVIEW
+  TERM_SHEET
+  LEGAL
+  CLOSED
+  PASSED
+  PORTFOLIO
+}
+
+enum FundraisingStage {
+  TARGET
+  PROSPECT
+  FIRST_MEETING
+  DILIGENCE
+  COMMITMENT
+  SUBSCRIPTION
+  FUNDED
+  DECLINED
+}
+
+enum DataRoomType {
+  DEAL_DILIGENCE
+  PORTFOLIO_COMPANY
+  FUND_LP
+  INTERNAL
+}
+
+enum InteractionType {
+  EMAIL
+  CALL
+  MEETING
+  NOTE
+  CONFERENCE
+  INTRO
+  FOLLOW_UP
+}
+
+enum KPICategory {
+  REVENUE
+  PROFITABILITY
+  GROWTH
+  OPERATIONAL
+  FINANCIAL
+  CUSTOMER
+  EMPLOYEE
+  OTHER
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum TransactionType {
+  CAPITAL_CALL
+  DISTRIBUTION
+  MANAGEMENT_FEE
+  CARRIED_INTEREST
+  RECALLABLE_DISTRIBUTION
+  RETURN_OF_CAPITAL
+  INCOME_DISTRIBUTION
+}
+
+enum ReportType {
+  QUARTERLY
+  ANNUAL
+  MONTHLY
+  AD_HOC
+  CAPITAL_ACCOUNT
+  K1_TAX
+  AUDITED_FINANCIALS
+}
+
+enum ReportStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ChecklistStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  WAIVED
+  NA
+}
+
+enum ExpertEngagementStatus {
+  IDENTIFIED
+  OUTREACH
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+// =============================================================================
+// AUTHENTICATION & USER MANAGEMENT
+// =============================================================================
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  emailVerified      DateTime?
+  name               String?
+  image              String?
+  passwordHash       String?
+  role               Role      @default(ANALYST)
+  isActive           Boolean   @default(true)
+  mfaEnabled         Boolean   @default(false)
+  mfaSecret          String?
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  passwordChangedAt  DateTime?
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // NextAuth relations
+  accounts           Account[]
+  sessions           Session[]
+
+  // Application relations
+  fundAccess         FundAccess[]
+  dealAssignments    DealAssignment[]
+  interactions       Interaction[]
+  researchNotes      ResearchNote[]
+  researchWorkspaces ResearchWorkspace[]
+  expertEngagements  ExpertEngagement[]
+  meetingRecords     MeetingRecord[]
+  auditLogs          AuditLog[]
+  dataRoomAccess     DataRoomAccess[]
+  documentAccessLogs DocumentAccessLog[]
+  uploadedDocuments  DataRoomDocument[]
+  icMemos            ICMemo[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model FundAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  fundId    String
+  canRead   Boolean  @default(true)
+  canWrite  Boolean  @default(false)
+  canAdmin  Boolean  @default(false)
+  grantedAt DateTime @default(now())
+  grantedBy String?
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fundId])
+  @@index([userId])
+  @@index([fundId])
+}
+
+// =============================================================================
+// CRM - CONTACTS, COMPANIES, DEALS
+// =============================================================================
+
+model Contact {
+  id                 String    @id @default(cuid())
+  firstName          String
+  lastName           String
+  email              String?   @unique
+  phone              String?
+  title              String?
+  linkedInUrl        String?
+  twitterHandle      String?
+  bio                String?   @db.Text
+  location           String?
+  timezone           String?
+  tags               String[]
+  isFounder          Boolean   @default(false)
+  isInvestor         Boolean   @default(false)
+  isExpert           Boolean   @default(false)
+  isLP               Boolean   @default(false)
+  dataClassification DataClassification @default(CONFIDENTIAL)
+  companyId          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company            Company?      @relation(fields: [companyId], references: [id])
+  interactions       Interaction[]
+  expertEngagements  ExpertEngagement[]
+  meetingRecords     MeetingRecord[]
+  fundraisingLeads   FundraisingLead[]
+
+  @@index([email])
+  @@index([companyId])
+  @@index([isLP])
+  @@index([isFounder])
+}
+
+model Company {
+  id                 String    @id @default(cuid())
+  name               String
+  legalName          String?
+  website            String?
+  description        String?   @db.Text
+  sector             String?
+  subSector          String?
+  stage              String?
+  foundedYear        Int?
+  headquarters       String?
+  country            String?
+  employeeCount      Int?
+  revenueRange       String?
+  linkedInUrl        String?
+  crunchbaseUrl      String?
+  pitchbookId        String?
+  dataClassification DataClassification @default(CONFIDENTIAL)
+  tags               String[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  contacts           Contact[]
+  deals              Deal[]
+  portfolioCompany   PortfolioCompany?
+  interactions       Interaction[]
+
+  @@index([name])
+  @@index([sector])
+}
+
+model Deal {
+  id                 String    @id @default(cuid())
+  name               String
+  companyId          String?
+  stage              DealStage @default(SOURCING)
+  description        String?   @db.Text
+  sector             String?
+  geography          String?
+  targetFundId       String?
+  checkSizeMin       Decimal?  @db.Decimal(18, 2)
+  checkSizeMax       Decimal?  @db.Decimal(18, 2)
+  targetOwnership    Decimal?  @db.Decimal(5, 4)
+  entryValuation     Decimal?  @db.Decimal(18, 2)
+  revenue            Decimal?  @db.Decimal(18, 2)
+  revenueGrowth      Decimal?  @db.Decimal(8, 4)
+  ebitda             Decimal?  @db.Decimal(18, 2)
+  sourceChannel      String?
+  sourceContact      String?
+  priority           Int       @default(3)
+  passReason         String?   @db.Text
+  icDate             DateTime?
+  closingDate        DateTime?
+  dataClassification DataClassification @default(CONFIDENTIAL)
+  tags               String[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company            Company?           @relation(fields: [companyId], references: [id])
+  targetFund         Fund?              @relation(fields: [targetFundId], references: [id])
+  assignments        DealAssignment[]
+  stageHistory       DealStageHistory[]
+  scorecard          ScreeningScorecard?
+  interactions       Interaction[]
+  researchWorkspace  ResearchWorkspace?
+  dataRoom           DataRoom?
+
+  @@index([stage])
+  @@index([companyId])
+  @@index([targetFundId])
+  @@index([createdAt])
+}
+
+model DealAssignment {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    String
+  role      String
+  isPrimary Boolean  @default(false)
+  assignedAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, userId])
+  @@index([dealId])
+  @@index([userId])
+}
+
+model DealStageHistory {
+  id          String    @id @default(cuid())
+  dealId      String
+  fromStage   DealStage?
+  toStage     DealStage
+  changedById String?
+  changedAt   DateTime  @default(now())
+  notes       String?   @db.Text
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([changedAt])
+}
+
+model ScreeningScorecard {
+  id                 String   @id @default(cuid())
+  dealId             String   @unique
+  marketSize         Int?
+  marketSizeNotes    String?  @db.Text
+  teamStrength       Int?
+  teamStrengthNotes  String?  @db.Text
+  productDiff        Int?
+  productDiffNotes   String?  @db.Text
+  businessModel      Int?
+  businessModelNotes String?  @db.Text
+  traction           Int?
+  tractionNotes      String?  @db.Text
+  competition        Int?
+  competitionNotes   String?  @db.Text
+  financials         Int?
+  financialsNotes    String?  @db.Text
+  timing             Int?
+  timingNotes        String?  @db.Text
+  thesisAlignment    Int?
+  thesisAlignmentNotes String? @db.Text
+  totalScore         Decimal? @db.Decimal(5, 2)
+  recommendation     String?
+  summaryNotes       String?  @db.Text
+  completedAt        DateTime?
+  completedById      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+model Interaction {
+  id          String          @id @default(cuid())
+  type        InteractionType
+  subject     String
+  notes       String?         @db.Text
+  occurredAt  DateTime
+  dealId      String?
+  companyId   String?
+  contactId   String?
+  userId      String?
+  followUpAt  DateTime?
+  followUpDone Boolean       @default(false)
+  tags        String[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([occurredAt])
+}
+
+// =============================================================================
+// FUNDRAISING
+// =============================================================================
+
+model FundraisingLead {
+  id              String           @id @default(cuid())
+  fundId          String
+  contactId       String?
+  name            String
+  stage           FundraisingStage @default(PROSPECT)
+  targetAllocation Decimal?        @db.Decimal(18, 2)
+  committedAmount Decimal?         @db.Decimal(18, 2)
+  fundedAmount    Decimal?         @db.Decimal(18, 2)
+  currency        String           @default("USD")
+  investorType    String?
+  geography       String?
+  notes           String?          @db.Text
+  priority        Int              @default(3)
+  nextActionDate  DateTime?
+  nextActionNote  String?
+  passReason      String?          @db.Text
+  tags            String[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  fund    Fund     @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([fundId])
+  @@index([stage])
+  @@index([contactId])
+}
+
+// =============================================================================
+// RESEARCH & DILIGENCE
+// =============================================================================
+
+model ResearchWorkspace {
+  id          String   @id @default(cuid())
+  dealId      String   @unique
+  name        String
+  description String?  @db.Text
+  ownerId     String
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deal          Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  owner         User          @relation(fields: [ownerId], references: [id])
+  notes         ResearchNote[]
+  ddChecklists  DDChecklist[]
+  financialModels FinancialModel[]
+  icMemos       ICMemo[]
+
+  @@index([dealId])
+  @@index([ownerId])
+}
+
+model ResearchNote {
+  id          String             @id @default(cuid())
+  workspaceId String
+  authorId    String
+  title       String
+  content     String             @db.Text
+  category    String?
+  dataClassification DataClassification @default(CONFIDENTIAL)
+  tags        String[]
+  isPinned    Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User              @relation(fields: [authorId], references: [id])
+
+  @@index([workspaceId])
+  @@index([authorId])
+}
+
+model DDChecklist {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?         @db.Text
+  category    String
+  status      ChecklistStatus @default(NOT_STARTED)
+  assigneeId  String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  completedById String?
+  notes       String?         @db.Text
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  workspace ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model FinancialModel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  version     String   @default("1.0")
+  description String?  @db.Text
+  s3Key       String?
+  fileName    String?
+  fileSize    Int?
+  mimeType    String?
+  assumptions Json?
+  outputs     Json?
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model ICMemo {
+  id               String             @id @default(cuid())
+  workspaceId      String
+  authorId         String
+  version          String             @default("1.0")
+  status           String             @default("DRAFT")
+  executiveSummary String?            @db.Text
+  investmentThesis  String?           @db.Text
+  companyOverview  String?            @db.Text
+  marketAnalysis   String?            @db.Text
+  competitiveLandscape String?        @db.Text
+  teamAssessment   String?            @db.Text
+  financialAnalysis String?           @db.Text
+  riskFactors      String?            @db.Text
+  dealTerms        String?            @db.Text
+  recommendation   String?            @db.Text
+  appendices       Json?
+  dataClassification DataClassification @default(RESTRICTED)
+  publishedAt      DateTime?
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  workspace ResearchWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User              @relation(fields: [authorId], references: [id])
+
+  @@index([workspaceId])
+  @@index([authorId])
+  @@index([status])
+}
+
+// =============================================================================
+// EXPERT NETWORK
+// =============================================================================
+
+model ExpertEngagement {
+  id               String                 @id @default(cuid())
+  dealId           String?
+  contactId        String?
+  coordinatorId    String?
+  expertName       String
+  expertTitle      String?
+  expertCompany    String?
+  expertExpertise  String[]
+  status           ExpertEngagementStatus @default(IDENTIFIED)
+  scheduledAt      DateTime?
+  completedAt      DateTime?
+  durationMinutes  Int?
+  honorarium       Decimal?               @db.Decimal(10, 2)
+  currency         String                 @default("USD")
+  topics           String[]
+  keyFindings      String?                @db.Text
+  conflictsChecked Boolean                @default(false)
+  conflictNotes    String?                @db.Text
+  recordingConsent Boolean                @default(false)
+  transcriptS3Key  String?
+  dataClassification DataClassification   @default(RESTRICTED)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  coordinator User?    @relation(fields: [coordinatorId], references: [id])
+
+  @@index([dealId])
+  @@index([contactId])
+  @@index([status])
+}
+
+model MeetingRecord {
+  id           String   @id @default(cuid())
+  dealId       String?
+  title        String
+  meetingType  String
+  occurredAt   DateTime
+  attendees    String[]
+  agenda       String?  @db.Text
+  notes        String?  @db.Text
+  actionItems  Json?
+  recordedById String?
+  contactId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  recordedBy User?    @relation(fields: [recordedById], references: [id])
+  contact    Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([dealId])
+  @@index([recordedById])
+  @@index([occurredAt])
+}
+
+// =============================================================================
+// FUND & PORTFOLIO MANAGEMENT
+// =============================================================================
+
+model Fund {
+  id               String   @id @default(cuid())
+  name             String
+  legalName        String?
+  vintageYear      Int?
+  targetSize       Decimal? @db.Decimal(18, 2)
+  committedCapital Decimal? @db.Decimal(18, 2)
+  calledCapital    Decimal? @db.Decimal(18, 2)
+  distributedCapital Decimal? @db.Decimal(18, 2)
+  nav              Decimal? @db.Decimal(18, 2)
+  currency         String   @default("USD")
+  strategy         String?
+  geography        String[]
+  sectors          String[]
+  managementFeeRate Decimal? @db.Decimal(5, 4)
+  carriedInterestRate Decimal? @db.Decimal(5, 4)
+  hurdleRate       Decimal? @db.Decimal(5, 4)
+  investmentPeriodEnd DateTime?
+  fundTermEnd      DateTime?
+  gpEntityName     String?
+  lpEntityName     String?
+  custodian        String?
+  auditor          String?
+  legalCounsel     String?
+  taxAdvisor       String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  fundAccess         FundAccess[]
+  portfolioCompanies PortfolioCompany[]
+  capitalAccounts    CapitalAccount[]
+  investorReports    InvestorReport[]
+  fundraisingLeads   FundraisingLead[]
+  deals              Deal[]
+  dataRooms          DataRoom[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model PortfolioCompany {
+  id                  String   @id @default(cuid())
+  fundId              String
+  companyId           String   @unique
+  dealId              String?
+  investmentDate      DateTime
+  initialInvestment   Decimal  @db.Decimal(18, 2)
+  totalInvested       Decimal  @db.Decimal(18, 2)
+  currentOwnership    Decimal  @db.Decimal(5, 4)
+  fullyDilutedOwnership Decimal? @db.Decimal(5, 4)
+  boardSeat           Boolean  @default(false)
+  observerSeat        Boolean  @default(false)
+  currentValuation    Decimal? @db.Decimal(18, 2)
+  moic                Decimal? @db.Decimal(8, 4)
+  irr                 Decimal? @db.Decimal(8, 4)
+  realizedProceeds    Decimal? @db.Decimal(18, 2)
+  unrealizedValue     Decimal? @db.Decimal(18, 2)
+  isRealized          Boolean  @default(false)
+  realizedDate        DateTime?
+  exitType            String?
+  status              String   @default("ACTIVE")
+  currency            String   @default("USD")
+  securityType        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  fund             Fund              @relation(fields: [fundId], references: [id])
+  company          Company           @relation(fields: [companyId], references: [id])
+  kpis             PortfolioKPI[]
+  valuationHistory ValuationHistory[]
+  alerts           PortfolioAlert[]
+  dataRooms        DataRoom[]
+
+  @@index([fundId])
+  @@index([companyId])
+  @@index([investmentDate])
+  @@index([isRealized])
+}
+
+model PortfolioKPI {
+  id                 String      @id @default(cuid())
+  portfolioCompanyId String
+  category           KPICategory
+  metricName         String
+  metricValue        Decimal     @db.Decimal(18, 4)
+  unit               String?
+  periodStart        DateTime
+  periodEnd          DateTime
+  isProjection       Boolean     @default(false)
+  sourceDocument     String?
+  notes              String?     @db.Text
+  reportedAt         DateTime    @default(now())
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  portfolioCompany PortfolioCompany @relation(fields: [portfolioCompanyId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioCompanyId])
+  @@index([category])
+  @@index([periodEnd])
+}
+
+model ValuationHistory {
+  id                 String   @id @default(cuid())
+  portfolioCompanyId String
+  valuationDate      DateTime
+  preMoney           Decimal? @db.Decimal(18, 2)
+  postMoney          Decimal? @db.Decimal(18, 2)
+  sharePrice         Decimal? @db.Decimal(18, 6)
+  impliedValuation   Decimal? @db.Decimal(18, 2)
+  fairValue          Decimal  @db.Decimal(18, 2)
+  valuationMethod    String
+  roundType          String?
+  currency           String   @default("USD")
+  notes              String?  @db.Text
+  source             String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  portfolioCompany PortfolioCompany @relation(fields: [portfolioCompanyId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioCompanyId])
+  @@index([valuationDate])
+}
+
+model PortfolioAlert {
+  id                 String        @id @default(cuid())
+  portfolioCompanyId String
+  severity           AlertSeverity
+  status             AlertStatus   @default(OPEN)
+  category           String
+  title              String
+  description        String        @db.Text
+  recommendedAction  String?       @db.Text
+  triggeredAt        DateTime      @default(now())
+  acknowledgedAt     DateTime?
+  acknowledgedById   String?
+  resolvedAt         DateTime?
+  resolvedById       String?
+  resolutionNotes    String?       @db.Text
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  portfolioCompany PortfolioCompany @relation(fields: [portfolioCompanyId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioCompanyId])
+  @@index([severity])
+  @@index([status])
+}
+
+model CapitalAccount {
+  id          String   @id @default(cuid())
+  fundId      String
+  lpName      String
+  lpEntityType String?
+  commitment  Decimal  @db.Decimal(18, 2)
+  calledCapital Decimal @db.Decimal(18, 2) @default(0)
+  uncalledCapital Decimal @db.Decimal(18, 2) @default(0)
+  distributedCapital Decimal @db.Decimal(18, 2) @default(0)
+  nav         Decimal  @db.Decimal(18, 2) @default(0)
+  moic        Decimal? @db.Decimal(8, 4)
+  irr         Decimal? @db.Decimal(8, 4)
+  currency    String   @default("USD")
+  bankAccountRef String?
+  taxId       String?
+  contactId   String?
+  isActive    Boolean  @default(true)
+  closingDate DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fund         Fund                 @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  transactions CapitalTransaction[]
+
+  @@index([fundId])
+  @@index([lpName])
+}
+
+model CapitalTransaction {
+  id               String          @id @default(cuid())
+  capitalAccountId String
+  type             TransactionType
+  amount           Decimal         @db.Decimal(18, 2)
+  currency         String          @default("USD")
+  effectiveDate    DateTime
+  settledDate      DateTime?
+  referenceNumber  String?
+  description      String?         @db.Text
+  wireConfirmation String?
+  isRecallable     Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  capitalAccount CapitalAccount @relation(fields: [capitalAccountId], references: [id], onDelete: Cascade)
+
+  @@index([capitalAccountId])
+  @@index([type])
+  @@index([effectiveDate])
+}
+
+// =============================================================================
+// INVESTOR REPORTING
+// =============================================================================
+
+model InvestorReport {
+  id               String       @id @default(cuid())
+  fundId           String
+  type             ReportType
+  status           ReportStatus @default(DRAFT)
+  title            String
+  periodStart      DateTime
+  periodEnd        DateTime
+  preparedById     String?
+  reviewedById     String?
+  approvedById     String?
+  publishedAt      DateTime?
+  s3Key            String?
+  fileName         String?
+  fileSize         Int?
+  mimeType         String?
+  dataClassification DataClassification @default(RESTRICTED)
+  distributionList String[]
+  distributedAt    DateTime?
+  notes            String?      @db.Text
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@index([fundId])
+  @@index([type])
+  @@index([status])
+  @@index([periodEnd])
+}
+
+// =============================================================================
+// DATA ROOM & DOCUMENT MANAGEMENT
+// =============================================================================
+
+model DataRoom {
+  id                 String       @id @default(cuid())
+  type               DataRoomType
+  name               String
+  description        String?      @db.Text
+  dealId             String?      @unique
+  fundId             String?
+  portfolioCompanyId String?
+  isActive           Boolean      @default(true)
+  isPublished        Boolean      @default(false)
+  publishedAt        DateTime?
+  closedAt           DateTime?
+  watermarkEnabled   Boolean      @default(true)
+  downloadEnabled    Boolean      @default(false)
+  printEnabled       Boolean      @default(false)
+  nda                Boolean      @default(true)
+  ndaTemplateKey     String?
+  dataClassification DataClassification @default(RESTRICTED)
+  createdById        String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  deal             Deal?             @relation(fields: [dealId], references: [id])
+  fund             Fund?             @relation(fields: [fundId], references: [id])
+  portfolioCompany PortfolioCompany? @relation(fields: [portfolioCompanyId], references: [id])
+  folders          DataRoomFolder[]
+  access           DataRoomAccess[]
+
+  @@index([type])
+  @@index([dealId])
+  @@index([fundId])
+  @@index([isActive])
+}
+
+model DataRoomFolder {
+  id           String    @id @default(cuid())
+  dataRoomId   String
+  parentId     String?
+  name         String
+  description  String?
+  sortOrder    Int       @default(0)
+  isRestricted Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  dataRoom  DataRoom         @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  parent    DataRoomFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children  DataRoomFolder[] @relation("FolderHierarchy")
+  documents DataRoomDocument[]
+
+  @@index([dataRoomId])
+  @@index([parentId])
+}
+
+model DataRoomDocument {
+  id                 String             @id @default(cuid())
+  folderId           String
+  uploadedById       String?
+  name               String
+  description        String?            @db.Text
+  s3Key              String
+  fileName           String
+  fileSize           Int
+  mimeType           String
+  checksum           String?
+  isEncrypted        Boolean            @default(true)
+  kmsKeyId           String?
+  dataClassification DataClassification @default(RESTRICTED)
+  tags               String[]
+  isActive           Boolean            @default(true)
+  deletedAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  folder     DataRoomFolder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  uploadedBy User?             @relation(fields: [uploadedById], references: [id])
+  versions   DocumentVersion[]
+  accessLogs DocumentAccessLog[]
+
+  @@index([folderId])
+  @@index([uploadedById])
+  @@index([isActive])
+}
+
+model DocumentVersion {
+  id           String   @id @default(cuid())
+  documentId   String
+  version      Int
+  s3Key        String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  checksum     String?
+  changeNotes  String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  document DataRoomDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model DataRoomAccess {
+  id           String    @id @default(cuid())
+  dataRoomId   String
+  userId       String
+  canView      Boolean   @default(true)
+  canDownload  Boolean   @default(false)
+  canUpload    Boolean   @default(false)
+  canManage    Boolean   @default(false)
+  ndaSigned    Boolean   @default(false)
+  ndaSignedAt  DateTime?
+  expiresAt    DateTime?
+  grantedById  String?
+  grantedAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  revokedById  String?
+
+  dataRoom DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dataRoomId, userId])
+  @@index([dataRoomId])
+  @@index([userId])
+}
+
+model DocumentAccessLog {
+  id           String   @id @default(cuid())
+  documentId   String
+  userId       String?
+  action       String
+  ipAddress    String?
+  userAgent    String?
+  sessionId    String?
+  downloadedAt DateTime?
+  viewedAt     DateTime @default(now())
+  metadata     Json?
+
+  document DataRoomDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User?            @relation(fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([viewedAt])
+}
+
+// =============================================================================
+// AUDIT LOGGING
+// =============================================================================
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  userEmail    String?
+  userRole     String?
+  action       String
+  resourceType String
+  resourceId   String?
+  resourceName String?
+  ipAddress    String?
+  userAgent    String?
+  sessionId    String?
+  requestId    String?
+  statusCode   Int?
+  before       Json?
+  after        Json?
+  metadata     Json?
+  integrityHash String?
+  occurredAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([occurredAt])
+}

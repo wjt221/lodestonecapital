@@ -1,0 +1,177 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20.x'
+
+jobs:
+  pre-deploy-checks:
+    name: Pre-Deploy Checks
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint check
+        run: npm run lint
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: pre-deploy-checks
+    if: needs.pre-deploy-checks.outputs.environment == 'staging' || github.event_name == 'push'
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run database migrations (staging)
+        run: npm run db:migrate:prod
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Deploy to Vercel (staging)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          AUTH_SECRET: ${{ secrets.STAGING_AUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.STAGING_URL }}
+          REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.STAGING_S3_BUCKET_NAME }}
+          AWS_KMS_KEY_ARN: ${{ secrets.STAGING_KMS_KEY_ARN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.STAGING_ENCRYPTION_KEY }}
+          AUDIT_HMAC_SECRET: ${{ secrets.STAGING_AUDIT_HMAC_SECRET }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-deploy-checks, deploy-staging]
+    if: needs.pre-deploy-checks.outputs.environment == 'production' && github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: ${{ secrets.PRODUCTION_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run database migrations (production)
+        run: npm run db:migrate:prod
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+
+      - name: Deploy to Vercel (production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+          AUTH_SECRET: ${{ secrets.PRODUCTION_AUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.PRODUCTION_URL }}
+          REDIS_URL: ${{ secrets.PRODUCTION_REDIS_URL }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.PRODUCTION_S3_BUCKET_NAME }}
+          AWS_KMS_KEY_ARN: ${{ secrets.PRODUCTION_KMS_KEY_ARN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.PRODUCTION_ENCRYPTION_KEY }}
+          AUDIT_HMAC_SECRET: ${{ secrets.PRODUCTION_AUDIT_HMAC_SECRET }}
+
+      - name: Create deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u +"%Y-%m-%dT%H:%M:%SZ") |" >> $GITHUB_STEP_SUMMARY
