@@ -8,6 +8,7 @@ import { portfolioRouter } from './routers/portfolio'
 import { dataroomRouter } from './routers/dataroom'
 import { reportingRouter } from './routers/reporting'
 import { auditRouter } from './routers/audit'
+import { dashboardRouter } from './routers/dashboard'
 
 export const appRouter = router({
   user: userRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   dataroom: dataroomRouter,
   reporting: reportingRouter,
   audit: auditRouter,
+  dashboard: dashboardRouter,
 })
 
 export type AppRouter = typeof appRouter
