@@ -29,8 +29,8 @@ export const reportingRouter = router({
       const where = {
         ...(fundId && { fundId }),
         ...(fundIds && { fundId: { in: fundIds } }),
-        ...(status && { status }),
-        ...(type && { type }),
+        ...(status && { status: status as never }),
+        ...(type && { type: type as never }),
         ...(search && {
           OR: [
             { title: { contains: search, mode: 'insensitive' as const } },

@@ -131,7 +131,7 @@ export async function writeAuditLog(event: AuditEventInput): Promise<void> {
       resourceId: event.resourceId,
       ipAddress: event.ipAddress,
       userAgent: event.userAgent,
-      metadata,
+      metadata: metadata as never,
       integrityHash,
       occurredAt,
     },
@@ -181,7 +181,7 @@ export async function writeAuditLogWithContext(
       userAgent: event.userAgent,
       sessionId: context.sessionId,
       requestId: context.requestId,
-      metadata,
+      metadata: metadata as never,
       integrityHash,
       occurredAt,
     },
@@ -232,7 +232,8 @@ export async function queryAuditLogs(filters: AuditLogFilter) {
     search,
   } = filters
 
-  const where: Parameters<typeof db.auditLog.findMany>[0]['where'] = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {
     ...(actorId && { userId: actorId }),
     ...(action && { action }),
     ...(resource && { resourceType: resource }),

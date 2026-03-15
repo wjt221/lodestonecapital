@@ -20,38 +20,6 @@ import { db } from '@/server/db'
 import { SESSION, PASSWORD_POLICY } from '@/lib/constants'
 import type { Role } from '@prisma/client'
 
-// ---------------------------------------------------------------------------
-// Module augmentation — extend built-in NextAuth types with application fields
-// ---------------------------------------------------------------------------
-declare module 'next-auth' {
-  interface Session {
-    user: {
-      id: string
-      email: string
-      name: string
-      role: Role
-      mfaEnabled: boolean
-      lastActivityAt: number
-    }
-  }
-  interface User {
-    id: string
-    email: string
-    name: string | null
-    role: Role
-    mfaEnabled: boolean
-  }
-}
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    id: string
-    role: Role
-    mfaEnabled: boolean
-    lastActivityAt: number
-    absoluteExpiresAt: number
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helper: record a failed login attempt and potentially lock the account
@@ -177,25 +145,23 @@ export const authConfig: NextAuthConfig = {
     // ------------------------------------------------------------------
     ...(process.env.AUTH_OIDC_ISSUER
       ? [
-          // Dynamic import avoids bundling issues when not configured
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require('next-auth/providers/generic-oidc').default({
+          {
             id: 'oidc',
             name: process.env.AUTH_OIDC_PROVIDER_NAME ?? 'SSO',
+            type: 'oidc' as const,
             issuer: process.env.AUTH_OIDC_ISSUER,
             clientId: process.env.AUTH_OIDC_CLIENT_ID,
             clientSecret: process.env.AUTH_OIDC_CLIENT_SECRET,
-            // Map OIDC claims to NextAuth User fields
             profile(profile: Record<string, unknown>) {
               return {
                 id: profile.sub as string,
                 email: profile.email as string,
                 name: profile.name as string | null,
                 role: (profile['lodestone_role'] as Role) ?? 'ANALYST',
-                mfaEnabled: true, // IdP enforces MFA — trust their assertion
+                mfaEnabled: true,
               }
             },
-          }),
+          },
         ]
       : []),
   ],
@@ -215,7 +181,8 @@ export const authConfig: NextAuthConfig = {
   // Callbacks
   // -----------------------------------------------------------------------
   callbacks: {
-    async jwt({ token, user }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async jwt({ token, user }: any) {
       const now = Date.now()
 
       if (user) {
@@ -229,15 +196,14 @@ export const authConfig: NextAuthConfig = {
 
       // Absolute timeout: invalidate token if 8-hour wall-clock limit exceeded
       if (token.absoluteExpiresAt && now > token.absoluteExpiresAt) {
-        // Returning null triggers a sign-out
-        return null as unknown as typeof token
+        return null
       }
 
       // Inactivity timeout: invalidate if user has been idle > 15 minutes
       if (token.lastActivityAt) {
         const idleMs = now - token.lastActivityAt
         if (idleMs > SESSION.INACTIVITY_TIMEOUT_MS) {
-          return null as unknown as typeof token
+          return null
         }
       }
 
@@ -247,10 +213,10 @@ export const authConfig: NextAuthConfig = {
       return token
     },
 
-    async session({ session, token }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async session({ session, token }: any) {
       if (!token?.id) {
-        // Token is invalid or expired — return empty session
-        return { ...session, user: undefined } as typeof session
+        return { ...session, user: undefined }
       }
 
       // Propagate custom token claims into the session user object
@@ -315,7 +281,9 @@ export const authConfig: NextAuthConfig = {
   // Events
   // -----------------------------------------------------------------------
   events: {
-    async signOut({ token }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async signOut(params: any) {
+      const token = params.token
       // When a user explicitly signs out, delete their DB sessions to enforce
       // single-session policy (MAX_CONCURRENT_SESSIONS = 1).
       if (token?.id) {

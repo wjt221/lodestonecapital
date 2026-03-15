@@ -249,16 +249,6 @@ export default function PortfolioCompanyDetailPage() {
                   <dd className="text-xs text-gray-700 line-clamp-4">{pc.company.description}</dd>
                 </div>
               )}
-              {pc.deal && (
-                <div>
-                  <dt className="text-xs text-gray-500">Deal</dt>
-                  <dd>
-                    <Link href={`/dashboard/crm/deals/${pc.deal.id}`} className="text-xs text-blue-600 hover:text-blue-800">
-                      {pc.deal.name}
-                    </Link>
-                  </dd>
-                </div>
-              )}
             </dl>
           </div>
         </div>

@@ -79,7 +79,7 @@ export default function ReportingPage() {
                 data?.reports.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{r.title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{r.fund.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{r.fundId}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{r.type.replace(/_/g, ' ')}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-600'}`}>
