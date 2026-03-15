@@ -9,6 +9,32 @@ import { hash } from 'bcryptjs'
 const authedProcedure = publicProcedure.use(requireAuth)
 
 export const userRouter = router({
+  register: publicProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      email: z.string().email().max(255),
+      password: z.string().min(12),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.user.findUnique({ where: { email: input.email.toLowerCase() } })
+      if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'An account with this email already exists.' })
+
+      const passwordHash = await hash(input.password, 12)
+
+      const user = await ctx.db.user.create({
+        data: {
+          email: input.email.toLowerCase(),
+          name: input.name,
+          role: 'ANALYST',
+          passwordHash,
+          isActive: true,
+        },
+        select: { id: true, email: true, name: true, role: true },
+      })
+      return user
+    }),
+
+
   list: authedProcedure
     .use(requirePermission(Permission.USER_PROVISION))
     .input(PaginationSchema.extend({

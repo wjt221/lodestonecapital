@@ -1,42 +1,41 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { trpc } from '@/lib/trpc/client'
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const registered = searchParams.get('registered') === '1'
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+
+  const register = trpc.user.register.useMutation({
+    onSuccess: () => {
+      router.push('/login?registered=1')
+    },
+    onError: (err) => {
+      setError(err.message ?? 'Registration failed. Please try again.')
+    },
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
-    try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        setError('Invalid credentials or account locked. Please try again.')
-      } else {
-        router.push('/dashboard')
-        router.refresh()
-      }
-    } catch {
-      setError('An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
     }
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters.')
+      return
+    }
+
+    register.mutate({ name, email, password })
   }
 
   return (
@@ -47,15 +46,10 @@ export default function LoginPage() {
             <span className="text-white text-2xl font-bold">L</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Lodestone Capital</h1>
-          <p className="mt-2 text-sm text-gray-600">Investment Management Platform</p>
+          <p className="mt-2 text-sm text-gray-600">Create your account</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {registered && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
-              Account created successfully. Please sign in.
-            </div>
-          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
               {error}
@@ -63,6 +57,23 @@ export default function LoginPage() {
           )}
 
           <div className="space-y-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="Jane Smith"
+              />
+            </div>
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -88,34 +99,46 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="••••••••••••"
+                placeholder="Min. 12 characters"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                Confirm password
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="Re-enter password"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={register.isPending}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {register.isPending ? 'Creating account...' : 'Create account'}
           </button>
 
           <p className="text-center text-sm text-gray-600">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-              Create one
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              Sign in
             </Link>
-          </p>
-
-          <p className="text-center text-xs text-gray-500">
-            Session expires after 15 minutes of inactivity or 8 hours total.
-            MFA required for RESTRICTED data access.
           </p>
         </form>
       </div>
