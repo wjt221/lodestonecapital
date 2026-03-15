@@ -107,7 +107,7 @@ export const dealRouter = router({
     .use(auditLog('create', 'Deal'))
     .input(DealCreateSchema)
     .mutation(async ({ ctx, input }) => {
-      const { fundId, sourcedBy, probabilityWeight, targetInvestment, estimatedClose, passedReason, classification, ...rest } = input as typeof input & {
+      const { fundId, sourcedBy, probabilityWeight: _pw, targetInvestment: _ti, estimatedClose: _ec, passedReason: _pr, classification, ...rest } = input as typeof input & {
         fundId?: string
         sourcedBy?: string
         probabilityWeight?: number
@@ -154,7 +154,7 @@ export const dealRouter = router({
     .use(auditLog('update', 'Deal'))
     .input(DealUpdateSchema)
     .mutation(async ({ ctx, input }) => {
-      const { id, fundId, sourcedBy, probabilityWeight, targetInvestment, estimatedClose, passedReason, classification, ...rest } = input as typeof input & {
+      const { id, fundId, sourcedBy, probabilityWeight: _pw2, targetInvestment: _ti2, estimatedClose: _ec2, passedReason: _pr2, classification, ...rest } = input as typeof input & {
         id: string
         fundId?: string
         sourcedBy?: string

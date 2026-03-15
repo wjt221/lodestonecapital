@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z as _z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, publicProcedure } from '@/server/trpc/trpc'
 import { requireAuth, requirePermission, auditLog } from '@/server/trpc/middleware'
@@ -89,12 +89,10 @@ export const fundRouter = router({
     .use(auditLog('create', 'Fund'))
     .input(FundCreateSchema)
     .mutation(async ({ ctx, input }) => {
-      const { vintage, status, classification, ...rest } = input as typeof input & { vintage?: number; status?: string; classification?: string }
+      const { vintage: _v1, status: _s1, classification: _c1, ...rest } = input as typeof input & { vintage?: number; status?: string; classification?: string }
+      const vintageYear = (input as unknown as { vintage?: number }).vintage
       const fund = await ctx.db.fund.create({
-        data: {
-          ...rest,
-          vintageYear: (input as unknown as { vintage?: number }).vintage,
-        } as never,
+        data: { ...rest, ...(vintageYear !== undefined && { vintageYear }) } as never,
       })
       return fund
     }),
@@ -104,7 +102,7 @@ export const fundRouter = router({
     .use(auditLog('update', 'Fund'))
     .input(FundCreateSchema.partial().extend({ id: zz.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
-      const { id, vintage, status, classification, ...rest } = input as typeof input & { id: string; vintage?: number; status?: string; classification?: string }
+      const { id, vintage, status: _s2, classification: _c2, ...rest } = input as typeof input & { id: string; vintage?: number; status?: string; classification?: string }
       const fund = await ctx.db.fund.update({
         where: { id },
         data: { ...rest, ...(vintage !== undefined && { vintageYear: vintage }) } as never,

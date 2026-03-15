@@ -1,8 +1,7 @@
-import { initTRPC, TRPCError } from '@trpc/server'
+import { initTRPC } from '@trpc/server'
 import superjson from 'superjson'
 import { ZodError } from 'zod'
 import { db } from '@/server/db'
-import type { Session } from 'next-auth'
 import type { Role } from '@prisma/client'
 
 export interface TRPCContext {

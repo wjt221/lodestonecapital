@@ -76,7 +76,7 @@ interface SidebarProps {
   userEmail: string
 }
 
-export function Sidebar({ userRole, userName, userEmail }: SidebarProps) {
+export function Sidebar({ userRole, userName, userEmail: _userEmail }: SidebarProps) {
   const pathname = usePathname()
 
   const visibleItems = navItems.filter((item) =>

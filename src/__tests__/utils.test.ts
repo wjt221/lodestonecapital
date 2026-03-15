@@ -2,7 +2,7 @@ import {
   formatCurrency,
   formatCompactCurrency,
   formatPercent,
-  formatDate,
+  formatDate as _formatDate,
   formatFileSize,
   calculateIRR,
   slugify,

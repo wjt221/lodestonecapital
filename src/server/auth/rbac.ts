@@ -1,4 +1,4 @@
-import { Role, DataClassification } from '@prisma/client'
+import type { Role, DataClassification } from '@prisma/client'
 
 // ============================================================
 // PERMISSION DEFINITIONS

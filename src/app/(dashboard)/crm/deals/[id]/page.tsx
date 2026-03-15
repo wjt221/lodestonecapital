@@ -26,7 +26,7 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function DealDetailPage() {
   const params = useParams()
-  const router = useRouter()
+  const _router = useRouter()
   const id = params.id as string
   const [stageNotes, setStageNotes] = useState('')
   const [showStageModal, setShowStageModal] = useState(false)

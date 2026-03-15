@@ -4,7 +4,7 @@ import {
   randomBytes,
   createHash,
 } from 'crypto'
-import { DataClassification } from '@prisma/client'
+import type { DataClassification } from '@prisma/client'
 
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12 // 96 bits — recommended for GCM

@@ -164,7 +164,7 @@ export const reportingRouter = router({
     .use(auditLog('create', 'CapitalAccount'))
     .input(CapitalAccountSchema)
     .mutation(async ({ ctx, input }) => {
-      const { calledAmount, distributedAmount, investorUserId, investorName, ownership, classification, ...rest } = input as typeof input & {
+      const { calledAmount, distributedAmount, investorUserId: _iuid, investorName, ownership: _own, classification: _cls, ...rest } = input as typeof input & {
         calledAmount?: number
         distributedAmount?: number
         investorUserId?: string
@@ -197,7 +197,7 @@ export const reportingRouter = router({
         return_of_capital: 'RETURN_OF_CAPITAL',
       }
 
-      const { type, date, status, referenceNumber, ...rest } = input as typeof input & {
+      const { type, date, status: _txStatus, referenceNumber, ...rest } = input as typeof input & {
         type: string
         date: Date
         status?: string

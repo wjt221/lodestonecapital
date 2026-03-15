@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { formatCompactCurrency, formatDate, formatPercent } from '@/lib/utils'
+import { formatCompactCurrency, formatPercent } from '@/lib/utils'
 
 export default function PortfolioPage() {
   const [search, setSearch] = useState('')
