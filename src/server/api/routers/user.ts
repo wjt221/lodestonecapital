@@ -21,11 +21,15 @@ export const userRouter = router({
 
       const passwordHash = await hash(input.password, 12)
 
+      // First user ever registered becomes SUPER_ADMIN
+      const userCount = await ctx.db.user.count()
+      const role = userCount === 0 ? 'SUPER_ADMIN' : 'ANALYST'
+
       const user = await ctx.db.user.create({
         data: {
           email: input.email.toLowerCase(),
           name: input.name,
-          role: 'ANALYST',
+          role,
           passwordHash,
           isActive: true,
         },
