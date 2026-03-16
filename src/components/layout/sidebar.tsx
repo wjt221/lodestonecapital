@@ -2,9 +2,27 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 import type { Role } from '@prisma/client'
 import { hasAnyPermission, Permission } from '@/server/auth/rbac'
+
+function CompassLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="18.5" stroke="#C9A84C" strokeWidth="1.2" />
+      <circle cx="20" cy="20" r="13" stroke="#C9A84C" strokeWidth="0.6" strokeDasharray="2 3" />
+      <path d="M20 5 L22.2 19 L20 21 L17.8 19 Z" fill="#C9A84C" />
+      <path d="M20 35 L22.2 21 L20 19 L17.8 21 Z" fill="#475569" />
+      <circle cx="20" cy="20" r="1.8" fill="#C9A84C" />
+      <circle cx="20" cy="20" r="0.7" fill="#0F172A" />
+      <line x1="20" y1="2" x2="20" y2="5" stroke="#C9A84C" strokeWidth="1.2" />
+      <line x1="20" y1="35" x2="20" y2="38" stroke="#475569" strokeWidth="1.2" />
+      <line x1="2" y1="20" x2="5" y2="20" stroke="#475569" strokeWidth="1.2" />
+      <line x1="35" y1="20" x2="38" y2="20" stroke="#475569" strokeWidth="1.2" />
+    </svg>
+  )
+}
 
 interface NavItem {
   label: string
@@ -86,14 +104,14 @@ export function Sidebar({ userRole, userName, userEmail: _userEmail }: SidebarPr
   return (
     <aside className="w-64 min-h-screen bg-gray-900 text-white flex flex-col">
       {/* Logo */}
-      <div className="p-6 border-b border-gray-700">
+      <div className="p-5 border-b border-gray-700/60">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-            L
+          <div className="w-9 h-9 bg-[#0F172A] rounded-full flex items-center justify-center border border-amber-500/30">
+            <CompassLogo size={22} />
           </div>
           <div>
-            <p className="font-semibold text-sm">Lodestone Capital</p>
-            <p className="text-xs text-gray-400">Investment Platform</p>
+            <p className="font-semibold text-sm tracking-wide">Lodestone Capital</p>
+            <p className="text-xs text-gray-500 tracking-widest uppercase" style={{ fontSize: '9px' }}>Investment Management</p>
           </div>
         </div>
       </div>
@@ -131,14 +149,12 @@ export function Sidebar({ userRole, userName, userEmail: _userEmail }: SidebarPr
             <p className="text-xs text-gray-400 truncate">{userRole.replace('_', ' ')}</p>
           </div>
         </div>
-        <form action="/api/auth/signout" method="POST" className="mt-3">
-          <button
-            type="submit"
-            className="w-full text-left text-xs text-gray-400 hover:text-gray-200 transition-colors px-0"
-          >
-            Sign out
-          </button>
-        </form>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="mt-3 w-full text-left text-xs text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   )

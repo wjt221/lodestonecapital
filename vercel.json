@@ -1,0 +1,23 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "prisma generate && node scripts/setup-db.mjs && next build",
+  "functions": {
+    "src/app/api/trpc/[trpc]/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/auth/[...nextauth]/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/bootstrap/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0" }
+      ]
+    }
+  ]
+}

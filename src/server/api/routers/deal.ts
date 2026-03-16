@@ -123,7 +123,7 @@ export const dealRouter = router({
           companyId: rest.companyId,
           stage: rest.stage,
           sourceChannel: rest.sourceChannel,
-          sourceContact: sourcedBy,
+          sourceContact: sourcedBy ?? ctx.user!.id,
           targetFundId: fundId,
           dataClassification: classification as never,
           assignments: {

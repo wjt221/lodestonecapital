@@ -15,8 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error('DATABASE_URL is not set');
-  process.exit(1);
+  console.warn('DATABASE_URL is not set — skipping database schema setup.');
+  process.exit(0);
 }
 
 // Remove channel_binding param which isn't supported by WebSocket transport
@@ -58,6 +58,7 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Database setup failed:', err.message);
-  process.exit(1);
+  console.warn('Database setup warning:', err.message);
+  // Non-fatal: schema may already exist or DB may be unreachable at build time.
+  process.exit(0);
 });

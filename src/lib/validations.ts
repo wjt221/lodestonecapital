@@ -74,11 +74,11 @@ export const CompanyUpdateSchema = CompanyCreateSchema.partial().extend({
 
 export const DealCreateSchema = z.object({
   name: z.string().min(1).max(255),
-  companyId: z.string().cuid(),
+  companyId: z.string().cuid().optional(),
   stage: z.nativeEnum(DealStage).default('SOURCING'),
   fundId: z.string().cuid().optional(),
   sourceChannel: z.enum(['inbound', 'outbound', 'intermediary', 'proprietary']),
-  sourcedBy: z.string().cuid(),
+  sourcedBy: z.string().cuid().optional(),
   probabilityWeight: z.number().min(0).max(1).optional(),
   targetInvestment: z.number().positive().optional(),
   estimatedClose: z.date().optional(),
