@@ -237,16 +237,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
 
   // ----------------------------------------------------------------
-  // SUPER_ADMIN: System administration only — ZERO business data access
-  // P-05: SA has zero access to business data
+  // SUPER_ADMIN: Full access — all business data + all admin permissions
   // ----------------------------------------------------------------
-  SUPER_ADMIN: [
-    Permission.SYSTEM_CONFIG,
-    Permission.USER_PROVISION,
-    Permission.ACCESS_REVIEW,
-    // NOTE: No CRM, Research, Portfolio, Reporting, or DataRoom permissions.
-    // SA can provision accounts but cannot view any business data.
-  ],
+  SUPER_ADMIN: Object.values(Permission),
 }
 
 // ============================================================
@@ -295,8 +288,7 @@ export function canAccessDataClassification(
 ): boolean {
   switch (role) {
     case 'SUPER_ADMIN':
-      // SA can only access PUBLIC configuration data — never business data
-      return classification === 'PUBLIC'
+      return true
 
     case 'LP_VIEWER':
       // LP investors can see their own reports (CONFIDENTIAL) and public data
